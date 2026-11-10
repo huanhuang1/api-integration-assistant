@@ -1,0 +1,40 @@
+openapi: 3.1.1
+info:
+  title: Fictional Account API
+  version: '1.0'
+servers:
+  - url: https://sandbox.example.invalid
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
+paths:
+  /accounts:
+    post:
+      operationId: createAccount
+      summary: Open an account for a verified customer
+      description: Requires a customer ID and a verification ID whose status is PASSED.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [customerId, verificationId, currency]
+              properties:
+                customerId: {type: string, pattern: '^cus_[a-zA-Z0-9_]+$'}
+                verificationId: {type: string, pattern: '^ver_[a-zA-Z0-9_]+$'}
+                currency: {type: string, enum: [USD, EUR]}
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [accountId]
+                properties:
+                  accountId: {type: string, pattern: '^acc_[a-zA-Z0-9_]+$'}

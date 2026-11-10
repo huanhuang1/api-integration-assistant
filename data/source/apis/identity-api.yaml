@@ -1,0 +1,40 @@
+openapi: 3.1.1
+info:
+  title: Fictional Identity API
+  version: '1.0'
+servers:
+  - url: https://sandbox.example.invalid
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth: {type: http, scheme: bearer}
+paths:
+  /identity-verifications:
+    post:
+      operationId: verifyIdentity
+      summary: Verify a customer's identity
+      description: Use PERSON_ID for individuals and COMPANY_REGISTRATION for businesses. Only PASSED permits account creation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [customerId, verificationType]
+              properties:
+                customerId: {type: string, pattern: '^cus_[a-zA-Z0-9_]+$'}
+                verificationType: {type: string, enum: [PERSON_ID, COMPANY_REGISTRATION]}
+      responses:
+        '200':
+          description: Verification result
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [verificationId, status]
+                properties:
+                  verificationId: {type: string, pattern: '^ver_[a-zA-Z0-9_]+$'}
+                  status: {type: string, enum: [PASSED, FAILED, PENDING]}

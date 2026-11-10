@@ -1,0 +1,27 @@
+rule_id: personal_account_rules
+description: Personal account-opening fields and synthetic examples. All values are fictional.
+operations:
+  createCustomer:
+    explanation: Create the individual customer using their full name. Keep the returned customerId for later steps.
+    fixed: {customerType: PERSONAL}
+    example_inputs: {fullName: Alex Example}
+    context_inputs: {}
+    optional_fields: [marketingOptIn]
+    not_applicable_fields: [legalName, companyRegistrationNumber]
+    example_response: {customerId: cus_demo_001}
+  verifyIdentity:
+    explanation: Verify personal identity using PERSON_ID as the verification type and the customerId from createCustomer. Check the returned status before proceeding.
+    fixed: {verificationType: PERSON_ID}
+    example_inputs: {}
+    context_inputs: {}
+    optional_fields: []
+    not_applicable_fields: []
+    example_response: {verificationId: ver_demo_001, status: PASSED}
+  createAccount:
+    explanation: Create the account in the requested currency using customerId and verificationId from the earlier responses, only after verification returns PASSED.
+    fixed: {}
+    example_inputs: {}
+    context_inputs: {currency: currency}
+    optional_fields: []
+    not_applicable_fields: []
+    example_response: {accountId: acc_demo_001}

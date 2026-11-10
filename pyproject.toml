@@ -1,0 +1,41 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bny-api-assistant-demo"
+version = "0.1.0"
+description = "A local LangChain prototype for API integration guidance using fictional data"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "langchain-core>=1.0,<2",
+  "langchain-ollama>=1.0,<2",
+  "langchain-chroma>=1.0,<2",
+  "chromadb>=1.0,<2",
+  "pydantic>=2.10,<3",
+  "python-dotenv>=1.0,<2",
+  "PyYAML>=6.0,<7",
+  "jsonschema>=4.23,<5",
+  "streamlit>=1.45,<2",
+]
+
+[project.scripts]
+api-assistant = "api_assistant.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/api_assistant"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = ["integration: requires local Ollama models and a real vector index"]
+addopts = "-m 'not integration'"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]

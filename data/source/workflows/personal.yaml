@@ -1,0 +1,20 @@
+workflow_id: open_personal_account
+title: New personal customer account opening
+description: Open a USD or EUR account for a new individual, personal or retail customer. Create the customer, verify personal identity, then create the account only after PASSED verification.
+intent: open_account
+customer_type: PERSONAL
+customer_status: NEW
+example_questions:
+  - I want to open a USD account for a new individual customer.
+  - How do I onboard a new person and set up their euro bank account?
+  - Which APIs create a personal account for a first-time customer?
+api_sequence: [createCustomer, verifyIdentity, createAccount]
+bindings:
+  verifyIdentity.customerId: createCustomer.response.customerId
+  createAccount.customerId: createCustomer.response.customerId
+  createAccount.verificationId: verifyIdentity.response.verificationId
+gate:
+  before: createAccount
+  source: verifyIdentity.response.status
+  equals: PASSED
+rule_id: personal_account_rules

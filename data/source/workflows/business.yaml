@@ -1,0 +1,20 @@
+workflow_id: open_business_account
+title: New business customer account opening
+description: Open a USD or EUR account for a new company, business, organization or corporate customer. Create the business customer, verify company registration, then create the account only after PASSED verification.
+intent: open_account
+customer_type: BUSINESS
+customer_status: NEW
+example_questions:
+  - Open a USD account for a new business customer.
+  - Which APIs onboard a new corporation and establish a euro account?
+  - I need an account for a newly registered company.
+api_sequence: [createCustomer, verifyIdentity, createAccount]
+bindings:
+  verifyIdentity.customerId: createCustomer.response.customerId
+  createAccount.customerId: createCustomer.response.customerId
+  createAccount.verificationId: verifyIdentity.response.verificationId
+gate:
+  before: createAccount
+  source: verifyIdentity.response.status
+  equals: PASSED
+rule_id: business_account_rules

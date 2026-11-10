@@ -1,0 +1,51 @@
+openapi: 3.1.1
+info:
+  title: Fictional Customer API
+  version: '1.0'
+servers:
+  - url: https://sandbox.example.invalid
+security:
+  - bearerAuth: []
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+paths:
+  /customers:
+    post:
+      operationId: createCustomer
+      summary: Create a new personal or business customer
+      description: Personal customers supply fullName. Businesses supply legalName and companyRegistrationNumber.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required: [customerType, fullName]
+                  properties:
+                    customerType: {type: string, const: PERSONAL}
+                    fullName: {type: string, minLength: 1, description: Full name from customer business data}
+                    marketingOptIn: {type: boolean, description: Optional marketing preference}
+                - type: object
+                  additionalProperties: false
+                  required: [customerType, legalName, companyRegistrationNumber]
+                  properties:
+                    customerType: {type: string, const: BUSINESS}
+                    legalName: {type: string, minLength: 1, description: Registered business name}
+                    companyRegistrationNumber: {type: string, minLength: 1}
+                    marketingOptIn: {type: boolean, description: Optional marketing preference}
+      responses:
+        '201':
+          description: Customer created
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [customerId]
+                properties:
+                  customerId: {type: string, pattern: '^cus_[a-zA-Z0-9_]+$'}
