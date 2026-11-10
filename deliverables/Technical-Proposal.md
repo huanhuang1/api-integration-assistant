@@ -1,274 +1,141 @@
-# API Integration Assistant Technical Proposal
+# API Integration Assistant Prototype Plan
 
-The proposed assistant helps API consumers turn a business goal into an integration guide. It identifies the applicable workflow, explains the required API sequence, selects scenario-relevant attributes, identifies where values come from, and supplies examples with references to the underlying specifications and rules.
+Build a small chat assistant that turns a business request into an API integration guide. Use LangChain, two dummy workflows, and three dummy APIs. The first prototype must demonstrate real embeddings and vector search. This plan describes the proposed implementation; the APIs and business rules below are fictional.
 
-The recommended first implementation uses LangChain to coordinate a fixed retrieval and generation pipeline. Actual embeddings and vector retrieval are required in the first prototype. Semantic search discovers candidate workflows; exact lookups retrieve their complete definitions, API contracts, and linked rules. This document describes the proposed implementation, not an implemented system. All example APIs and business rules are fictional and do not represent BNY systems.
+## 1 What the user gets
 
-## 1 Purpose and architecture
+Example question: “I want to open a USD account for a new individual customer. Which APIs should I call, and what should I send?”
 
-### Intended user experience
+The assistant returns the API sequence, the fields needed for that scenario, where their values come from, and sample requests. For this example, the sequence is create customer, verify identity, then create account after verification passes. The prototype provides guidance; it does not execute banking transactions.
 
-A developer asks: “I want to open a USD account for a new individual customer. Which APIs should I call, and what should I send?” The assistant returns the applicable workflow and its conditions; an ordered list of operations; required, conditional, optional, and inapplicable fields; value sources and response-to-request mappings; example requests; and specific source references.
+![Simple ingestion and RAG flow](assets/pipeline-simple-en.png)
 
-For the demonstration, the answer explains how to create a customer, verify identity, and create an account. It shows how customerId and verificationId pass between operations, and why personal details apply while company registration details do not. The current scope is integration guidance. Mock execution can be added if required; live banking transactions are outside this prototype's default scope.
+## 2 What we ingest and store
 
-### Workflow and scenario
+Ingestion reads descriptions of APIs and workflows. Start with local files supplied by the team or authored as dummy data.
 
-A workflow defines how to achieve a business outcome: steps, order, prerequisites, branches, and data dependencies. A scenario describes the conditions under which that outcome is needed. Several scenarios can share one branching workflow, or be represented by separate workflows. There is no universal one-to-one relationship.
-
-The prototype defines two workflows, open_personal_account and open_business_account, to make selection observable. They share three operations but differ in attribute applicability and verification type. Both cover new customers only. The real workflow structure should follow the supplied business definitions.
-
-![Architecture of ingestion and retrieval](assets/pipeline-detailed-en.png)
-
-Ingestion prepares and indexes knowledge before questions arrive. The online retrieval augmented generation pipeline retrieves relevant evidence and uses it to produce an answer. The LLM interprets language and explains evidence. Application code controls lookups, versions, validation, and failure handling. Approved workflow definitions determine API order.
-
-## 2 Knowledge and storage model
-
-### Complete records and the vector index
-
-An embedding represents text numerically for similarity search. A vector record must also carry searchable text or a reference to it, plus metadata linking to complete knowledge. The vector itself cannot reconstruct an API contract. The prototype can store original sources and canonical records in JSON/YAML files, and maintain a local persistent Chroma index through LangChain. This is a prototype choice; enterprise storage remains to be agreed. [LangChain Chroma integration](https://docs.langchain.com/oss/python/integrations/vectorstores/chroma)
-
-| Record | Essential contents | Use during a question |
+| Input | What it contains | Where the prototype keeps it |
 | --- | --- | --- |
-| Original source | Specification, workflow, rules, source revision and location | Evidence and reprocessing |
-| Workflow | ID, version, purpose, applicability, ordered steps, branches, operation and rule references, bindings | Complete integration plan |
-| API operation | API ID, spec version, operationId, method/path, parameters, request/response schemas, shared definitions, authentication requirements | Contract and example constraints |
-| Business rule | ID, version, scope, conditions, constraints, exceptions, source, executable-check status | Scenario requirements |
-| Vector record | Searchable text, embedding, document type, canonical reference, bundle and source metadata | Candidate discovery |
+| OpenAPI YAML or JSON | API method, path, request and response fields, requirements | Complete records in operations.json |
+| Workflow YAML or JSON | Description, applicable scenario, API sequence, data passed between steps | Complete records in workflows.json |
+| Rules and checked examples | Scenario-specific fields, conditions, sample values | Complete records in rules.json |
 
-These are logical responsibilities, not a requirement to deploy several databases. A project directory and a local vector index are sufficient for the small demonstration.
+The workflow registry is simply the collection of workflow records. A workflow can reuse APIs used by other workflows. For this demo, maintain personal and business account-opening workflows with the same three APIs but different field requirements. Both workflows cover new customers only.
 
-### Linking a vector hit to complete knowledge
+The first version embeds workflow descriptions into a local Chroma vector store. Each entry includes its workflow_id. Complete API definitions and rules stay in the JSON files and are read by ID after a workflow is selected.
 
-The following abbreviated vector record omits the numerical embedding:
-
-```yaml
-text: "Open an account for a new individual customer"
-metadata:
-  document_type: workflow
-  workflow_id: open_personal_account
-  workflow_version: "1.0"
-  bundle_id: demo-v1
-  source_ref: workflows/personal.yaml
-```
-
-After retrieving this record, code calls get_workflow with its workflow ID, version, and bundle. The complete workflow references customer-api / v1 / createCustomer and the other required operations. Code follows those references to fetch full contracts and rules, rather than reconstructing them from search snippets.
-
-Use API ID, specification version, and operationId together as an operation key. operationId alone is not globally unique across APIs and versions. Workflow version, API version, source revision, and index batch are also distinct. A bundle_id identifies a validated set of mutually compatible records and its index, allowing one answer to use a consistent snapshot.
+<!-- pagebreak -->
 
 ## 3 Ingestion pipeline
 
-### Parse and validate the inputs
+Run ingestion before the chat starts, and rerun it when the input files change. Use one fixed version of the dummy dataset and rebuild the index on updates.
 
-Load OpenAPI specifications, supplied workflows, business rules, and approved examples. Preserve source locations and revisions. Parse methods, paths, operation IDs, parameter locations, request/response schemas, required properties, enums, formats, and authentication requirements. Resolve needed schema references while retaining a reference graph for recursive definitions. Unresolved references must produce an ingestion error. [OpenAPI 3.1.1 specification](https://spec.openapis.org/oas/v3.1.1.html)
+1. Read the files. Parse YAML or JSON into Python objects and retain each source filename.
+2. Extract API records. Read each operation's method, path, operationId, parameters, request and response schemas, required fields, allowed values, and authentication requirements. Use simple inline schemas for the dummy APIs. A YAML loader reads the file structure; our code extracts the OpenAPI fields.
+3. Read workflow records and rules. The workflow file explicitly states the API sequence and data dependencies. If the team supplies only prose, turn it into a draft workflow and have the workflow owner confirm it. For the demo, write these records manually.
+4. Check and save. Confirm referenced APIs and rules exist and that the named input/output fields are valid. Stop ingestion if required information is missing or contradictory. Save the complete records in local JSON files.
+5. Build the vector index. Create one short search document per workflow using its description, applicability, and example questions. Generate embeddings through LangChain and save the text, vector, and workflow_id in Chroma. Use the same embedding model for later questions.
 
-Normalize workflows and rules into consistent records. A workflow owner must confirm ordering, branches, applicability, and bindings. If only prose exists, an LLM may propose a draft registry entry for review. The prototype uses manually authored workflow definitions so uncertain inference does not determine execution order.
+### Example workflow record
 
-Check that every referenced operation and rule exists in the selected version set; input and output paths are valid; and constraints are consistent. Retain source locators such as file path, operationId, schema JSON Pointer, or rule section. Do not activate a bundle with broken references or contradictory mandatory constraints.
-
-### Prepare retrieval units
-
-Chunking should preserve the meaning of each knowledge unit rather than splitting every source at arbitrary character boundaries.
-
-| Type | Retrieval unit | Context retained with each unit |
-| --- | --- | --- |
-| Workflow | A compact description of one complete scenario or workflow | Goal, applicability, exclusions, example questions, ID |
-| API | Documentation for one operation | API identity, purpose, parameters, schema references, version |
-| Rule | One complete rule | Condition, consequence, exceptions, scope, rule ID |
-
-Long descriptions may need smaller chunks, but each chunk retains a canonical reference. A rule's condition and consequence must remain connected. Index workflow descriptions, API documentation, and rule text in the first prototype. Workflow records support initial discovery; API and rule passages support optional explanatory retrieval after a workflow has been selected. Required contracts and rules still come from exact linked reads.
-
-### Embed and publish a consistent bundle
-
-Generate an embedding for each retrieval unit and write the vector, text, and metadata to the index. Record the embedding model and relevant configuration. Queries must use a compatible embedding model; incompatible model changes require reindexing.
-
-On updates, build and validate a new set of complete records and corresponding index before changing the active bundle. Pin each answer to that bundle. Remove obsolete records from the active search scope and retain prior bundles when needed for traceability. Full rebuilding is acceptable for the small prototype; incremental synchronization can follow when source volume requires it.
-
-## 4 Online retrieval and answer generation
-
-### Discover and select a workflow
-
-1. Prepare the query from the current message and relevant conversation context. If the user first asks about account opening and then replies “business,” retain the account-opening intent. New versus existing customer status still needs evidence or clarification; do not invent it. New corrections replace earlier assumptions.
-2. Embed that query and perform actual vector search, filtering document_type to workflow and pinning the active bundle. Apply hard scenario filters only for known conditions; do not assume personal or business when unspecified.
-3. Return top-k candidate IDs, versions, descriptions, applicability, sources, and retrieval scores. With two workflows, k can include both. Tune k with a larger dataset later. A similarity score is a retrieval signal, not proof of eligibility.
-4. Ask the LLM for a constrained decision: matched, needs_clarification, or unsupported. A match names a retrieved candidate; clarification identifies a missing condition that changes selection. Structured output helps application code consume this decision, but does not establish its correctness. [LangChain structured output](https://docs.langchain.com/oss/python/langchain/structured-output)
-5. Validate the decision in code. The ID must belong to the returned candidates, resolve to an existing record and version, and satisfy known conditions. Reject invalid IDs and contradictory selections.
-
-“Open an account” requires clarification about customer type. “Open a USD account for a new business customer” can select the business workflow. An unsupported transfer request may still have nearest neighbors in the index; the selector must not force it into an account-opening workflow.
-
-### Retrieve all required evidence
-
-Fetch the complete selected workflow, including all steps, branches, prerequisites, and bindings. For each step, fetch its operation contract using the compound operation key. Retrieve rules explicitly linked from the workflow, its operations, and the applicable shared rules declared in the bundle. Evaluate applicability against known scenario conditions and retain provenance.
-
-Required rules must not depend on top-k semantic recall. Optional supplemental search can explain terminology or locate supporting text within the selected workflow's linked, version-consistent material. The small prototype can fit the full evidence package into context. At larger scale, generate per step with complete local evidence rather than truncating mandatory constraints.
-
-### Resolve attributes and validate examples
-
-Combine the API contract and scenario rules to distinguish required, conditional, optional, and inapplicable fields. Identify whether each value comes from user business data, an allowed enum, environment configuration, or a previous response. Scenario instructions cannot silently override a schema requirement; conflicting sources produce a data error.
-
-A request for examples does not normally require real customer information. Use clearly labeled synthetic values or placeholders. Missing customer type may block workflow selection; missing a real customer name usually does not block an illustrative guide.
-
-Generate the explanation and structured example requests from the evidence. Validate schemas, enums, field paths, cross-step bindings, and encoded business constraints. Check that citations resolve to records actually loaded. A bounded repair attempt may receive validation errors; if it still fails, report the problem rather than mark the example valid. Passing schema validation neither executes an API nor proves that a live service will accept the request.
-
-| Result | Condition | User-facing behavior |
-| --- | --- | --- |
-| matched | Applicable workflow and complete evidence | Cited integration guide |
-| needs_clarification | Missing selection-critical condition | A specific clarification question |
-| unsupported | No candidate covers the known goal | State the gap in available knowledge |
-| data_error | Broken reference, version mismatch, or conflicting constraints | Explain the knowledge problem and stop affected generation |
-
-The first three are selection outcomes. data_error is an application result and must not be disguised as an unsupported customer request.
-
-## 5 Worked account opening example
-
-### Shared operations and scenario differences
-
-Both demonstration workflows use version 1.0 and bundle demo-v1. The following fictional gate permits account creation only after identity verification returns PASSED. Other verification outcomes require separate handling outside this simplified workflow.
-
-| Step | Operation and endpoint | Main input and output |
-| --- | --- | --- |
-| 1 Create customer | customer-api / v1 / createCustomer; POST /customers | Customer type and applicable details; returns customerId |
-| 2 Verify identity | identity-api / v1 / verifyIdentity; POST /identity-verifications | customerId and verificationType; returns verificationId and status |
-| 3 Create account | account-api / v1 / createAccount; POST /accounts | customerId, verificationId, currency; returns accountId |
-
-| Requirement | open_personal_account | open_business_account |
-| --- | --- | --- |
-| customerType | PERSONAL | BUSINESS |
-| Customer details | fullName required | legalName and companyRegistrationNumber required |
-| verificationType | PERSON_ID | COMPANY_REGISTRATION |
-| currency | User selects USD or EUR | User selects USD or EUR |
-
-The dummy OpenAPI should encode compatible conditional schemas, for example oneOf branches for personal and business customer requests. Sharing an operation does not mean every property applies to every workflow.
-
-### Selection and registry lookup
-
-The user requests a USD account for a new individual customer. Search retrieves candidates; applicability checks select open_personal_account. Code resolves the selected workflow and its operation references. The abbreviated registry below illustrates the essential links, rather than a complete executable configuration:
+This abbreviated YAML shows the relationship between a workflow and its APIs. For this controlled demo, give all three operations unique operation IDs.
 
 ```yaml
 workflow_id: open_personal_account
-workflow_version: "1.0"
-bundle_id: demo-v1
-steps:
-  - id: customer
-    operation_ref: customer-api/v1/createCustomer
-  - id: verification
-    operation_ref: identity-api/v1/verifyIdentity
-    bindings:
-      customerId: customer.response.customerId
-  - id: account
-    operation_ref: account-api/v1/createAccount
-    requires: verification.response.status == PASSED
-    bindings:
-      customerId: customer.response.customerId
-      verificationId: verification.response.verificationId
-rule_refs:
-  - personal-customer/1.0
-  - verification-gate/1.0
+description: Open an account for a new individual customer
+customer_type: PERSONAL
+customer_status: NEW
+api_sequence: [createCustomer, verifyIdentity, createAccount]
+bindings:
+  verifyIdentity.customerId: createCustomer.response.customerId
+  createAccount.customerId: createCustomer.response.customerId
+  createAccount.verificationId: verifyIdentity.response.verificationId
+account_creation_requires: verifyIdentity.response.status == PASSED
+rule_id: personal_account_rules
 ```
 
-### Example requests and value provenance
+The workflow owner confirms the sequence, conditions, and bindings. The application then reads them from the registry. API specifications explain how to call individual APIs; the workflow definition supplies the business sequence.
 
-First, POST /customers. PERSONAL comes from the confirmed scenario; Alex Example is synthetic and would be replaced with customer data supplied by the integrating application.
+For example, the personal_account_rules record requires PERSONAL, fullName, and PERSON_ID verification. The business record instead requires BUSINESS, legalName, companyRegistrationNumber, and COMPANY_REGISTRATION verification. The dummy API schemas must agree with these scenario requirements.
+
+<!-- pagebreak -->
+
+## 4 RAG pipeline and backend lookup
+
+RAG retrieves stored information and gives it to the LLM to produce an answer. The backend for this prototype consists of the local JSON records and the Chroma index.
+
+1. Read the question and relevant chat context. Capture conditions the user actually supplied, such as personal versus business and new versus existing customer.
+2. Embed the question and search Chroma. Return the two closest workflow descriptions with their IDs. Show the real retrieval results in a developer trace so vector search is visible in the demo.
+3. Select or clarify. Give the candidates and question to the LLM. It selects an applicable candidate or asks for missing information. Validate that the selected ID belongs to the retrieved candidates. A nearest result alone does not prove a match.
+4. Read the complete workflow by ID from workflows.json. Follow its api_sequence to read each full operation from operations.json, and its rule_id to read all linked rules and examples from rules.json. These reads are ordinary application lookups.
+5. Generate the guide. Give the LLM the question, complete workflow, API definitions, and rules. Ask for the call order, applicable fields, value sources, and sample requests. Attach source filenames and operation IDs.
+6. Check the answer. Check sample payloads against the dummy schemas, preserve IDs passed between steps, and enforce the verification condition. If a check fails, report the problem instead of presenting the example as ready to use.
+
+### The lookup in a few lines
+
+The following is pseudocode. The lookup and validation functions are application code we need to implement.
+
+```python
+query = combine_question_and_chat_context(message, history)
+candidates = vector_search(query, k=2)
+choice = select_or_clarify(query, candidates)
+if choice.needs_clarification or choice.unsupported:
+    return choice.message
+check_selected_id(choice.workflow_id, candidates)
+workflow = workflows_by_id[choice.workflow_id]
+apis = [operations_by_id[key] for key in workflow.api_sequence]
+rules = rules_by_id[workflow.rule_id]
+answer = generate_guide(query, workflow, apis, rules)
+return check_examples_and_sources(answer, workflow, apis, rules)
+```
+
+“Open an account” needs a question about customer type and status. A request for a money transfer is unsupported by this dataset. A missing API record is a data problem. Handle these cases explicitly rather than forcing an account-opening answer.
+
+LangChain connects the embedding model, vector store, and LLM. Our Python code handles OpenAPI parsing, registry reads, and business checks. A fixed chain is sufficient; tools or MCP can be added later if needed.
+
+<!-- pagebreak -->
+
+## 5 Example answer and demo checks
+
+For a new personal customer opening a USD account, the guide uses the following fictional requests. Names and response IDs are synthetic examples; a real integration uses customer data and actual API responses. Server details and authentication come from the API specification.
+
+### First create the customer
+
+POST /customers. PERSONAL comes from the selected scenario; fullName comes from customer data.
 
 ```json
 {"customerType": "PERSONAL", "fullName": "Alex Example"}
 ```
 
-Assume a mock response of {"customerId": "cus_demo_001"}. Second, POST /identity-verifications uses that returned ID. PERSON_ID comes from the personal workflow rule.
+Assume the response returns customerId = cus_demo_001.
+
+### Then verify identity
+
+POST /identity-verifications. Reuse customerId; PERSON_ID comes from the personal workflow rule.
 
 ```json
 {"customerId": "cus_demo_001", "verificationType": "PERSON_ID"}
 ```
 
-Assume a mock response of {"verificationId": "ver_demo_001", "status": "PASSED"}. Once the gate is satisfied, POST /accounts uses both preceding IDs. USD comes from the user's request and is allowed by the dummy contract.
+Assume the response returns verificationId = ver_demo_001 and status = PASSED.
+
+### Finally create the account
+
+POST /accounts, only after PASSED. Reuse both IDs; USD comes from the user's request and must be allowed by the API.
 
 ```json
-{
-  "customerId": "cus_demo_001",
-  "verificationId": "ver_demo_001",
-  "currency": "USD"
-}
+{"customerId": "cus_demo_001", "verificationId": "ver_demo_001",
+ "currency": "USD"}
 ```
 
-These are request-body illustrations with assumed responses, not executed calls. Actual integration also requires server configuration, authentication, and headers from the specification. Bindings must preserve returned IDs across steps. If verification returns FAILED, the guide must not authorize proceeding to step three.
+For a business customer, the guide uses legalName and companyRegistrationNumber in place of fullName, and COMPANY_REGISTRATION for verification. These differences come from the selected workflow rules and compatible API schemas.
 
-An answer could begin: “Use personal account opening version 1.0. Call createCustomer, then verifyIdentity, then createAccount after a PASSED result. Reuse the customerId from step one and verificationId from step two. fullName applies to this scenario; company registration details do not. Names and response IDs below are synthetic.” Attach references to the relevant workflow steps, request schema locations, and verification-gate rule, including versions.
+### What we build first
 
-## 6 Implementation and validation
+Use Python and LangChain, local JSON files, Chroma, and a simple chat page. Prepare the three dummy API specs, two workflow records, and their rules; implement ingestion; then connect retrieval, lookup, and answer generation.
 
-### Prototype components
+The demo should show real vector retrieval, correct personal/business selection, correct API order and field choices, valid example requests, and clarification for an ambiguous question. Also show that a missing record is reported and a failed identity check prevents the account-creation step.
 
-| Component | Proposed implementation | Responsibility |
-| --- | --- | --- |
-| Complete knowledge | JSON/YAML files with stable references | Workflows, operations, rules, version bundles |
-| Semantic retrieval | LangChain embedding interface and local Chroma | Indexing, candidate retrieval, metadata filters |
-| Model processing | Approved model with structured output | Candidate assessment, clarification, explanation |
-| Orchestration | Fixed Python sequence and lookup functions | Ordering, exact reads, failure handling |
-| Validation | Schema validator and explicit rule checks | Payloads, bindings, encoded constraints |
-| Chat interface | Minimal Streamlit page | Input, answers, separate diagnostic trace |
+Keep enterprise version management, permission integration, complex workflow branches, and live execution for a later iteration. The first review should focus on whether this small flow answers the tech lead's use case clearly.
 
-LangChain supplies integration interfaces; application code still implements knowledge reads and domain validation. Streamlit chat_input and chat_message can support a minimal interface. [Streamlit chat elements](https://docs.streamlit.io/develop/api-reference/chat)
-
-The following pseudocode describes responsibilities, not runnable code:
-
-```text
-bundle = pin_active_bundle()
-context = prepare_query(message, conversation)
-candidates = search_workflows(context, bundle)
-decision = select_or_clarify(context, candidates)
-validate_selection(decision, candidates)
-if decision.status != matched: return decision
-workflow = get_workflow(decision.id, decision.version, bundle)
-evidence = load_operations_and_all_applicable_rules(workflow)
-plan = resolve_steps_fields_and_bindings(workflow, evidence)
-draft = generate_guide(context, plan, evidence)
-return validate_examples_and_attach_sources(draft, evidence)
-```
-
-### Tools and MCP
-
-search_workflows, get_workflow, and get_api_spec can later be exposed as tools. Tool descriptions tell a model which capabilities exist; the underlying functions perform retrieval and reads. MCP can expose these capabilities to multiple clients through a common protocol. It does not supply the workflow matching algorithm. [LangChain tools](https://docs.langchain.com/oss/python/langchain/tools); [MCP architecture](https://modelcontextprotocol.io/docs/learn/architecture)
-
-A fixed chain is recommended first so vector retrieval always occurs and each stage is observable. The same functions can become tools or an MCP server later. Passing the entire small catalog directly into a prompt could be a baseline experiment, but does not satisfy the requirement to demonstrate vector retrieval.
-
-### Evaluation and diagnostic visibility
-
-Expose the prepared query, retrieved IDs and ranks, versions, selected workflow, loaded evidence references, and validation results in a developer trace. Scores must come from real execution; this proposal does not assume measured accuracy. End users receive guidance and sources rather than orchestration details.
-
-| Test or injected failure | Expected behavior |
-| --- | --- |
-| Personal and business requests with paraphrases | Correct workflow, attributes, verification type |
-| Ambiguous opening request followed by “business” | Clarification followed by contextual selection |
-| Transfer request outside the dataset | unsupported without an invented workflow |
-| Model selects an ID outside the candidates | Code rejects the decision |
-| Missing operation or rule; mixed versions | data_error with the damaged reference |
-| Invalid enum, missing required field, inconsistent ID | Example validation fails |
-| Verification status other than PASSED | Account-creation step remains blocked |
-| Updated sources and index | Consistent active bundle and traceable evidence |
-
-Measure candidate recall separately from final selection, field applicability, rule coverage, example validity, and citation correctness. Two workflows demonstrate the implementation path; they do not establish enterprise-scale retrieval quality.
-
-## 7 Delivery and decisions
-
-### Implementation sequence and acceptance
-
-First, author dummy specifications, two workflows, linked rules, and expected answers. Second, implement ingestion, reference checks, embeddings, and indexing. Third, implement selection, complete evidence loading, generation, and validation. Fourth, add the chat interface and run the evaluation set.
-
-Acceptance requires visible vector retrieval, correct workflow selection, registry-defined sequence, complete required evidence, clear value sources, valid example structures, and distinct handling of ambiguity, unsupported requests, and knowledge errors. Each stage should produce inspectable artifacts and traces.
-
-### Items to confirm before using enterprise data
-
-The available requirements are sufficient to start the dummy prototype. Before connecting real sources, confirm the initial business scenario and authoritative documents; workflow and rule owners; version-selection policy; permitted model and embedding services; storage and deployment environment; and whether mock execution is part of acceptance. Retrieval and exact reads should receive the same enterprise access scope when permissions are introduced. The fictional prototype does not imply an existing BNY authorization design.
-
-The practical benefit is faster discovery and interpretation of integration knowledge. It depends on source completeness and maintenance. Later evaluation can compare task completion time, answer correctness, and support requests without assuming benefits before measurement.
-
-### Technical references
-
-The architecture and fictional business rules are design recommendations. The following official references support the framework capabilities and contract concepts discussed above.
-
-- [OpenAPI 3.1.1](https://spec.openapis.org/oas/v3.1.1.html): operation contracts, schemas, parameters, and references.
-- [LangChain Chroma integration](https://docs.langchain.com/oss/python/integrations/vectorstores/chroma): vector-store integration and persistence.
-- [LangChain structured output](https://docs.langchain.com/oss/python/langchain/structured-output): constrained model responses.
-- [LangChain tools](https://docs.langchain.com/oss/python/langchain/tools): callable tool interfaces.
-- [MCP architecture](https://modelcontextprotocol.io/docs/learn/architecture): client and server responsibilities.
-- [Streamlit chat elements](https://docs.streamlit.io/develop/api-reference/chat): chat input and message components.
+Reference documentation: [OpenAPI](https://spec.openapis.org/oas/v3.1.1.html), [LangChain Chroma integration](https://docs.langchain.com/oss/python/integrations/vectorstores/chroma).
