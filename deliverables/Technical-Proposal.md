@@ -18,7 +18,7 @@ A workflow defines how to achieve a business outcome: steps, order, prerequisite
 
 The prototype defines two workflows, open_personal_account and open_business_account, to make selection observable. They share three operations but differ in attribute applicability and verification type. Both cover new customers only. The real workflow structure should follow the supplied business definitions.
 
-![Architecture of ingestion and retrieval](../work/pipeline-detailed-en.png)
+![Architecture of ingestion and retrieval](assets/pipeline-detailed-en.png)
 
 Ingestion prepares and indexes knowledge before questions arrive. The online retrieval augmented generation pipeline retrieves relevant evidence and uses it to produce an answer. The LLM interprets language and explains evidence. Application code controls lookups, versions, validation, and failure handling. Approved workflow definitions determine API order.
 
