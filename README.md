@@ -29,6 +29,8 @@ Try:
 
 Example buttons start a fresh conversation. **New conversation** clears the context. Expand **Inspect retrieval and backend lookups** below an answer to see actual vector distances, candidates, selected facts, exact record IDs, and validation results.
 
+The [English demo script](deliverables/Demo-Walkthrough.md) walks through the personal account example, its retrieval trace, and failed verification.
+
 The CLI exposes the same pipeline:
 
 ```bash

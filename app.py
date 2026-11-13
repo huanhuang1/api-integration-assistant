@@ -6,6 +6,7 @@ from api_assistant.assistant import IntegrationAssistant, render_markdown
 from api_assistant.config import Settings
 from api_assistant.store import KnowledgeStore
 
+# Initialize the page and session.
 st.set_page_config(page_title="API Integration Assistant", page_icon="🔗", layout="wide")
 settings = Settings.from_env()
 
@@ -18,6 +19,7 @@ with st.sidebar:
     st.write("**Chat model**", settings.chat_model)
     st.write("**Embedding model**", settings.embedding_model)
     try:
+        # Check the records produced by ingestion before enabling chat and example buttons.
         _, manifest = KnowledgeStore(settings).load()
         st.success(f"{manifest['workflow_count']} workflows · {manifest['operation_count']} APIs")
         ready = True

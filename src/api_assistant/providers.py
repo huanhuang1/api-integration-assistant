@@ -11,6 +11,8 @@ from api_assistant.models import GroundedIntent, Narration, ProviderError, Selec
 
 
 class LocalEmbeddings(Embeddings):
+    """Call the local Ollama embedding model for workflow documents and search queries."""
+
     def __init__(self, settings: Settings):
         self.model = settings.embedding_model
         self.dimension = None

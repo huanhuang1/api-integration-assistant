@@ -17,6 +17,7 @@ class IntegrationAssistant:
         self.settings = settings
         self.store = store or KnowledgeStore(settings)
         self.language_model = language_model or LocalLanguageModel(settings)
+        # Retrieve candidates, match a workflow, and return the answer.
         self.chain = RunnableLambda(self._retrieve) | RunnableLambda(self._answer)
 
     def invoke(self, message: str, history: list[dict] | None = None) -> Answer:

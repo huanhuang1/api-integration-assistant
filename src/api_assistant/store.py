@@ -17,6 +17,7 @@ COLLECTION = "api_integration_workflows"
 
 
 def _vector_store(settings: Settings, embeddings, create: bool = False):
+    """Open the local Chroma collection. Ingestion can create it on the first run."""
     return Chroma(
         collection_name=COLLECTION,
         embedding_function=embeddings,
@@ -36,6 +37,10 @@ def _write_json(path: Path, value):
 def ingest(settings: Settings, embeddings=None) -> dict:
     source_hash = source_fingerprint(settings.source_dir)
     records = load_sources(settings.source_dir)
+    # Each group of records is keyed by ID, for example:
+    # records["operations"]["createAccount"]
+    # records["workflows"]["open_personal_account"]
+    # records["rules"]["personal_account_rules"]
     embeddings = embeddings or LocalEmbeddings(settings)
     documents, ids = [], []
     for workflow_id, workflow in records["workflows"].items():
@@ -63,14 +68,17 @@ def ingest(settings: Settings, embeddings=None) -> dict:
     store = _vector_store(settings, embeddings, create=True)
     # Upsert deterministic IDs, then remove stale workflows. An interrupted update fails
     # the manifest/metadata checks on the next query, rather than mixing old and new data.
+    # LangChain embeds each workflow document and saves it in Chroma.
     store.add_documents(documents, ids=ids)
     stale = set(store.get()["ids"]) - set(ids)
     if stale:
         store.delete(ids=list(stale))
     if source_fingerprint(settings.source_dir) != source_hash:
         raise KnowledgeError("Source files changed during ingestion. Rerun ingestion.")
+    # Write the full operation, workflow, and rule records to separate JSON files.
     for name, value in records.items():
         _write_json(settings.store_dir / f"{name}.json", value)
+    # Record the fingerprints and index configuration for the next lookup.
     manifest = {
         "source_hash": source_hash,
         "records_hash": digest(records),
