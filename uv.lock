@@ -173,6 +173,47 @@ wheels = [
 ]
 
 [[package]]
+name = "api-integration-assistant-demo"
+version = "0.1.0"
+source = { editable = "." }
+dependencies = [
+    { name = "chromadb" },
+    { name = "jsonschema" },
+    { name = "langchain-chroma" },
+    { name = "langchain-core" },
+    { name = "langchain-ollama" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "pyyaml" },
+    { name = "streamlit" },
+]
+
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "chromadb", specifier = ">=1.0,<2" },
+    { name = "jsonschema", specifier = ">=4.23,<5" },
+    { name = "langchain-chroma", specifier = ">=1.0,<2" },
+    { name = "langchain-core", specifier = ">=1.0,<2" },
+    { name = "langchain-ollama", specifier = ">=1.0,<2" },
+    { name = "pydantic", specifier = ">=2.10,<3" },
+    { name = "python-dotenv", specifier = ">=1.0,<2" },
+    { name = "pyyaml", specifier = ">=6.0,<7" },
+    { name = "streamlit", specifier = ">=1.45,<2" },
+]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "pytest", specifier = ">=8,<10" },
+    { name = "ruff", specifier = ">=0.11,<1" },
+]
+
+[[package]]
 name = "attrs"
 version = "26.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -236,47 +277,6 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/54/79/875f9558179573d40a9cc743038ac2bf67dfb79cecb1e8b5d70e88c94c3d/bcrypt-5.0.0-pp311-pypy311_pp73-manylinux_2_28_x86_64.whl", hash = "sha256:046ad6db88edb3c5ece4369af997938fb1c19d6a699b9c1b27b0db432faae4c4", size = 273791, upload-time = "2025-09-25T19:50:39.913Z" },
     { url = "https://files.pythonhosted.org/packages/bc/fe/975adb8c216174bf70fc17535f75e85ac06ed5252ea077be10d9cff5ce24/bcrypt-5.0.0-pp311-pypy311_pp73-manylinux_2_34_aarch64.whl", hash = "sha256:dcd58e2b3a908b5ecc9b9df2f0085592506ac2d5110786018ee5e160f28e0911", size = 270746, upload-time = "2025-09-25T19:50:43.306Z" },
     { url = "https://files.pythonhosted.org/packages/e4/f8/972c96f5a2b6c4b3deca57009d93e946bbdbe2241dca9806d502f29dd3ee/bcrypt-5.0.0-pp311-pypy311_pp73-manylinux_2_34_x86_64.whl", hash = "sha256:6b8f520b61e8781efee73cba14e3e8c9556ccfb375623f4f97429544734545b4", size = 273375, upload-time = "2025-09-25T19:50:45.43Z" },
-]
-
-[[package]]
-name = "bny-api-assistant-demo"
-version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "chromadb" },
-    { name = "jsonschema" },
-    { name = "langchain-chroma" },
-    { name = "langchain-core" },
-    { name = "langchain-ollama" },
-    { name = "pydantic" },
-    { name = "python-dotenv" },
-    { name = "pyyaml" },
-    { name = "streamlit" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "pytest" },
-    { name = "ruff" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "chromadb", specifier = ">=1.0,<2" },
-    { name = "jsonschema", specifier = ">=4.23,<5" },
-    { name = "langchain-chroma", specifier = ">=1.0,<2" },
-    { name = "langchain-core", specifier = ">=1.0,<2" },
-    { name = "langchain-ollama", specifier = ">=1.0,<2" },
-    { name = "pydantic", specifier = ">=2.10,<3" },
-    { name = "python-dotenv", specifier = ">=1.0,<2" },
-    { name = "pyyaml", specifier = ">=6.0,<7" },
-    { name = "streamlit", specifier = ">=1.45,<2" },
-]
-
-[package.metadata.requires-dev]
-dev = [
-    { name = "pytest", specifier = ">=8,<10" },
-    { name = "ruff", specifier = ">=0.11,<1" },
 ]
 
 [[package]]

@@ -1,8 +1,8 @@
 # API Integration Assistant
 
-A working local prototype of the BNY onboarding-assistant proposal. Ask for an account-opening scenario and receive an API sequence, scenario-specific fields, value sources, and schema-checked JSON examples.
+A local prototype that helps developers integrate with account-opening APIs. Describe a scenario to get the API sequence, relevant fields, value sources, and schema-checked JSON examples.
 
-It uses **LangChain, real Ollama embeddings, Chroma, and a Streamlit chat interface**. All APIs, customers, rules, and examples are fictional. The application generates integration guidance; it does not execute banking APIs or represent actual BNY contracts.
+It uses **LangChain, real Ollama embeddings, Chroma, and a Streamlit chat interface**. All API contracts, customers, rules, and examples in the guide are fictional.
 
 ## Run it
 
